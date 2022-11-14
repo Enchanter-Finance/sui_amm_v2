@@ -1,7 +1,7 @@
 module univ2::pool {
     use sui::balance::{Self, Balance, Supply};
     use sui::coin::{Self, Coin};
-    use sui::object::{Self, UID};
+    use sui::object::{Self, UID, ID};
     use sui::transfer;
     use sui::tx_context::{Self, TxContext};
     use univ2::amm_core::{get_lp_coin_by_coinx_coiny_amount, get_coinx_coiny_by_lp_coin, get_amount_out, get_fee};
@@ -40,7 +40,7 @@ module univ2::pool {
     }
 
 
-    public entry fun withdraw_fee<X, Y>(pool: &mut Pool<X, Y>, g: Global, to: address, amount_x: u64, amount_y: u64, ctx: &mut TxContext) {
+    public entry fun withdraw_fee<X, Y>(pool: &mut Pool<X, Y>, g: &Global, to: address, amount_x: u64, amount_y: u64, ctx: &mut TxContext) {
         assert!(global::get_withdraw_address(g) == tx_context::sender(ctx), ENotAllow);
 
         let balance_x = balance::split(&mut pool.fee_x, amount_x);
@@ -49,14 +49,14 @@ module univ2::pool {
         transfer::transfer(coin::from_balance(balance_y, ctx), to);
     }
 
-    public entry fun set_dao_fee<X, Y>(pool: &mut Pool<X, Y>, g: Global, fee: u64, ctx: &mut TxContext) {
+    public entry fun set_dao_fee<X, Y>(pool: &mut Pool<X, Y>, g: &Global, fee: u64, ctx: &mut TxContext) {
         let sender_address = tx_context::sender(ctx);
         let (manager_address1, manager_address12) = get_manager_address(g) ;
         assert!(manager_address1 == sender_address || manager_address12 == sender_address, ENotAllow);
         pool.dao_fee = fee;
     }
 
-    public entry fun set_lp_fee<X, Y>(pool: &mut Pool<X, Y>, g: Global, fee: u64, ctx: &mut TxContext) {
+    public entry fun set_lp_fee<X, Y>(pool: &mut Pool<X, Y>, g: &Global, fee: u64, ctx: &mut TxContext) {
         let sender_address = tx_context::sender(ctx);
         let (manager_address1, manager_address12) = get_manager_address(g) ;
         assert!(manager_address1 == sender_address || manager_address12 == sender_address, ENotAllow);
@@ -64,10 +64,11 @@ module univ2::pool {
     }
 
 
-    public(friend) fun create_pool<X, Y>(ctx: &mut TxContext) {
+    public(friend) fun create_pool<X, Y>(ctx: &mut TxContext):ID {
         let (dao_fee, lp_fee) = get_default_fee();
-        transfer::share_object(Pool<X, Y> {
-            id: object::new(ctx),
+
+        let pool = Pool<X, Y> {
+            id:object::new(ctx),
             enable: true,
             reserve_x: balance::zero(),
             reserve_y: balance::zero(),
@@ -77,7 +78,12 @@ module univ2::pool {
             dao_fee,
             lp_fee,
             lp_supply: balance::create_supply(LPCoin<X, Y> {})
-        });
+        };
+
+        let id = object::id(&pool);
+
+        transfer::share_object(pool);
+        id
     }
 
     public(friend) fun add_liquidity<X, Y>(pool: &mut Pool<X, Y>, coin_x: Coin<X>, coin_y: Coin<Y>, ctx: &mut TxContext): Coin<LPCoin<X, Y>> {

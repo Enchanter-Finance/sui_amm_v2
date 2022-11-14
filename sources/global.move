@@ -2,11 +2,11 @@ module univ2::global {
     use std::ascii::into_bytes;
     use std::string::{Self, String};
     use std::type_name::{into_string, get};
-
-    use sui::object::{Self, UID};
+    use sui::object::{Self, UID, ID};
     use sui::transfer;
     use sui::tx_context::{TxContext, sender};
-    use sui::vec_set::{Self, VecSet};
+    use sui::vec_map;
+    use sui::vec_map::VecMap;
 
     const ENotAdmin: u64 = 0x0001;
 
@@ -14,7 +14,7 @@ module univ2::global {
 
     struct Global has key {
         id: UID,
-        pools: VecSet<String>,
+        pools: VecMap<String,ID>,
         withdraw_address: address,
         manager_address_1: address,
         manager_address_2: address,
@@ -27,7 +27,7 @@ module univ2::global {
 
         let global = Global {
             id: object::new(ctx),
-            pools: vec_set::empty<String>(),
+            pools: vec_map::empty<String,ID>(),
             withdraw_address: address,
             manager_address_1: address,
             manager_address_2: address
@@ -36,7 +36,7 @@ module univ2::global {
     }
 
 
-    public fun get_withdraw_address(g: Global): address {
+    public fun get_withdraw_address(g: &Global): address {
         g.withdraw_address
     }
 
@@ -55,18 +55,18 @@ module univ2::global {
         g.manager_address_2 = addr;
     }
 
-    public fun get_manager_address(g: Global): (address, address) {
+    public fun get_manager_address(g: &Global): (address, address) {
         (g.manager_address_1, g.manager_address_2)
     }
 
 
     public fun exist_pool<X, Y>(g: &Global): bool {
-        vec_set::contains(&g.pools, &get_pool_name<X, Y>())
+        vec_map::contains(&g.pools, &get_pool_name<X, Y>())
     }
 
 
-    public(friend) fun add_pool_flag<X, Y>(g: &mut Global) {
-        vec_set::insert(&mut g.pools, get_pool_name<X, Y>())
+    public(friend) fun add_pool_flag<X, Y>(g: &mut Global,id:ID) {
+        vec_map::insert(&mut g.pools, get_pool_name<X, Y>(),id);
     }
 
 

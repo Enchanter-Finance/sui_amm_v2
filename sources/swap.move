@@ -11,8 +11,8 @@ module univ2::swap {
 
     public entry fun create_pool<X, Y>(global: &mut Global, ctx: &mut TxContext) {
         assert!(!exist_pool<X, Y>(global) || !exist_pool<Y, X>(global), EPoolExist);
-        pool::create_pool<X, Y>(ctx);
-        global::add_pool_flag<X, Y>(global);
+        let id = pool::create_pool<X, Y>(ctx);
+        global::add_pool_flag<X, Y>(global,id);
     }
 
     public entry fun add_liquidity<X, Y>(
@@ -68,7 +68,7 @@ module univ2::swap {
     }
 
 
-    public entry fun swap_y_to_x<CoinIn, CoinOut>(pool: &mut Pool<CoinOut, CoinIn>, in: vector<Coin<CoinIn>>, ,in_amount: u64, min_out: u64, ctx: &mut TxContext) {
+    public entry fun swap_y_to_x<CoinIn, CoinOut>(pool: &mut Pool<CoinOut, CoinIn>, in: vector<Coin<CoinIn>>,in_amount: u64, min_out: u64, ctx: &mut TxContext) {
         let in_coin = coin::zero<CoinIn>(ctx);
         pay::join_vec(&mut in_coin, in);
         let out = pool::swap_y_to_x(pool, in_coin, ctx);
