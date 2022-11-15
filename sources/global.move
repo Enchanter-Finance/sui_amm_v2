@@ -5,8 +5,7 @@ module univ2::global {
     use sui::object::{Self, UID, ID};
     use sui::transfer;
     use sui::tx_context::{TxContext, sender};
-    use sui::vec_map;
-    use sui::vec_map::VecMap;
+    use sui::table;
 
     const ENotAdmin: u64 = 0x0001;
 
@@ -14,7 +13,7 @@ module univ2::global {
 
     struct Global has key {
         id: UID,
-        pools: VecMap<String,ID>,
+        pools: table::Table<String,ID>,
         withdraw_address: address,
         manager_address_1: address,
         manager_address_2: address,
@@ -24,10 +23,9 @@ module univ2::global {
     /// init global config
     fun init(ctx: &mut TxContext) {
         let address = sender(ctx);
-
         let global = Global {
             id: object::new(ctx),
-            pools: vec_map::empty<String,ID>(),
+            pools: table::new<String,ID>(ctx),
             withdraw_address: address,
             manager_address_1: address,
             manager_address_2: address
@@ -61,12 +59,12 @@ module univ2::global {
 
 
     public fun exist_pool<X, Y>(g: &Global): bool {
-        vec_map::contains(&g.pools, &get_pool_name<X, Y>())
+        table::contains(&g.pools, get_pool_name<X, Y>())
     }
 
 
     public(friend) fun add_pool_flag<X, Y>(g: &mut Global,id:ID) {
-        vec_map::insert(&mut g.pools, get_pool_name<X, Y>(),id);
+        table::add(&mut g.pools, get_pool_name<X, Y>(),id);
     }
 
 

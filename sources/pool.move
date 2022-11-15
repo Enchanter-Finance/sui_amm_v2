@@ -107,7 +107,7 @@ module univ2::pool {
         assert!(tok_amt < MAX_POOL_VALUE, EPoolFull);
         let balance_lp = balance::increase_supply(&mut pool.lp_supply, share_minted);
 
-        if (reserve_x == 0 && reserve_y == 0) {
+        if (lp_supply == 0) {
             balance::join(&mut pool.locked_lp, balance::split(&mut balance_lp, get_min_lp_value()));
         };
         coin::from_balance(balance_lp, ctx)

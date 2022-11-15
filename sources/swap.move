@@ -68,7 +68,7 @@ module univ2::swap {
     }
 
 
-    public entry fun swap_y_to_x<CoinIn, CoinOut>(pool: &mut Pool<CoinOut, CoinIn>, in: vector<Coin<CoinIn>>,in_amount: u64, min_out: u64, ctx: &mut TxContext) {
+    public entry fun swap_y_to_x<CoinOut, CoinIn>(pool: &mut Pool<CoinIn,CoinOut >, in: vector<Coin<CoinIn>>,in_amount: u64, min_out: u64, ctx: &mut TxContext) {
         let in_coin = coin::zero<CoinIn>(ctx);
         pay::join_vec(&mut in_coin, in);
         let out = pool::swap_y_to_x(pool, in_coin, ctx);
