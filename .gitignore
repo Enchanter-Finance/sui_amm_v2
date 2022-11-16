@@ -5,7 +5,7 @@ build
 /node_modules
 /.pnp
 .pnp.js
-.aptos
+.test
 
 # testing
 /coverage

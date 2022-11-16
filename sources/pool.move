@@ -1,14 +1,15 @@
-module univ2::pool {
+module enchanter_swap::pool {
     use sui::balance::{Self, Balance, Supply};
     use sui::coin::{Self, Coin};
     use sui::object::{Self, UID, ID};
     use sui::transfer;
     use sui::tx_context::{Self, TxContext};
-    use univ2::amm_core::{get_lp_coin_by_coinx_coiny_amount, get_coinx_coiny_by_lp_coin, get_amount_out, get_fee};
-    use univ2::constants::{get_default_fee, get_min_lp_value};
-    use univ2::global::{Self, Global, get_manager_address};
+    use enchanter_swap::amm_core::{get_lp_coin_by_coinx_coiny_amount, get_coinx_coiny_by_lp_coin, get_amount_out, get_fee, get_no_loss_values};
+    use enchanter_swap::constants::{get_default_fee, get_min_lp_value};
+    use enchanter_swap::events;
+    use enchanter_swap::global::{Self, Global, get_manager_address};
 
-    friend univ2::swap;
+    friend enchanter_swap::swap;
 
     const EZeroAmount: u64 = 0;
     const ENotAllow: u64 = 1;
@@ -17,8 +18,7 @@ module univ2::pool {
         18446744073709551615 / 10000
     };
 
-    const EPoolFull: u64 = 4;
-
+    const EPoolFull: u64 = 1;
     const EReservesEmpty: u64 = 2;
 
 
@@ -64,11 +64,11 @@ module univ2::pool {
     }
 
 
-    public(friend) fun create_pool<X, Y>(ctx: &mut TxContext):ID {
+    public(friend) fun create_pool<X, Y>(ctx: &mut TxContext): ID {
         let (dao_fee, lp_fee) = get_default_fee();
 
         let pool = Pool<X, Y> {
-            id:object::new(ctx),
+            id: object::new(ctx),
             enable: true,
             reserve_x: balance::zero(),
             reserve_y: balance::zero(),
@@ -82,23 +82,40 @@ module univ2::pool {
 
         let id = object::id(&pool);
 
+        events::emit_create_pool_event<X, Y>(tx_context::sender(ctx), id);
+
         transfer::share_object(pool);
         id
     }
 
-    public(friend) fun add_liquidity<X, Y>(pool: &mut Pool<X, Y>, coin_x: Coin<X>, coin_y: Coin<Y>, ctx: &mut TxContext): Coin<LPCoin<X, Y>> {
+    public(friend) fun add_liquidity<X, Y>(pool: &mut Pool<X, Y>,
+                                           coin_x: Coin<X>, coin_y: Coin<Y>,
+                                           coin_x_amount: u64,
+                                           coin_x_min: u64,
+                                           coin_y_amount: u64,
+                                           coin_y_min: u64,
+                                           ctx: &mut TxContext): (Coin<LPCoin<X, Y>>, Coin<X>, Coin<Y>) {
         let (coin_x_value, coin_y_value) = (coin::value(&coin_x), coin::value(&coin_y));
 
         assert!(coin_x_value > 0, EZeroAmount);
         assert!(coin_y_value > 0, EZeroAmount);
 
 
+        let (reserve_x, reserve_y, lp_supply) = get_reserve(pool);
+
+        let (no_loss_x, no_loss_y) = get_no_loss_values(coin_x_amount, coin_y_amount, coin_x_min, coin_y_min, reserve_x, reserve_y);
+
+        let (coin_x_rest_amount, coin_y_rest_amount) = (coin_x_value - reserve_x, coin_y_value - no_loss_y);
+
+        let coin_x_rest = coin::split(&mut coin_x, coin_x_rest_amount, ctx);
+        let coin_y_rest = coin::split(&mut coin_y, coin_y_rest_amount, ctx);
+
+
         let coin_x_balance = coin::into_balance(coin_x);
         let coin_y_balance = coin::into_balance(coin_y);
 
-        let (reserve_x, reserve_y, lp_supply) = get_reserve(pool);
 
-        let share_minted = get_lp_coin_by_coinx_coiny_amount(coin_x_value, coin_y_value, (lp_supply as u128), reserve_x, reserve_y);
+        let share_minted = get_lp_coin_by_coinx_coiny_amount(no_loss_x, no_loss_y, (lp_supply as u128), reserve_x, reserve_y);
 
         let sui_amt = balance::join(&mut pool.reserve_x, coin_x_balance);
         let tok_amt = balance::join(&mut pool.reserve_y, coin_y_balance);
@@ -107,14 +124,33 @@ module univ2::pool {
         assert!(tok_amt < MAX_POOL_VALUE, EPoolFull);
         let balance_lp = balance::increase_supply(&mut pool.lp_supply, share_minted);
 
+        let real_lp_amount = share_minted;
         if (lp_supply == 0) {
-            balance::join(&mut pool.locked_lp, balance::split(&mut balance_lp, get_min_lp_value()));
+            let min_lp_value = get_min_lp_value();
+            balance::join(&mut pool.locked_lp, balance::split(&mut balance_lp, min_lp_value));
+            real_lp_amount = share_minted - min_lp_value;
         };
-        coin::from_balance(balance_lp, ctx)
+
+
+        events::emit_add_lp_event<X, Y>(
+            tx_context::sender(ctx),
+            real_lp_amount,
+            coin_x_amount,
+            coin_y_amount,
+            no_loss_x,
+            no_loss_y,
+            reserve_x,
+            reserve_y,
+            lp_supply
+        );
+
+        (coin::from_balance(balance_lp, ctx), coin_x_rest, coin_y_rest)
     }
 
 
     public(friend) fun remove_liquidity<X, Y>(pool: &mut Pool<X, Y>, lp: Coin<LPCoin<X, Y>>,
+                                              min_x: u64,
+                                              min_y: u64,
                                               ctx: &mut TxContext): (Coin<X>, Coin<Y>, u64, u64) {
         let lp_amount = coin::value(&lp);
         assert!(lp_amount > 0, EZeroAmount);
@@ -122,6 +158,18 @@ module univ2::pool {
         let (x_removed, y_removed) = get_coinx_coiny_by_lp_coin(lp_amount, reserve_x, reserve_y, (lp_supply as u128));
 
         balance::decrease_supply(&mut pool.lp_supply, coin::into_balance(lp));
+        events::emit_remove_lp_event<X, Y>(
+            tx_context::sender(ctx),
+            lp_amount,
+            min_x,
+            min_y,
+            x_removed,
+            y_removed,
+            reserve_x,
+            reserve_y,
+            lp_supply
+        );
+
         (
             coin::take(&mut pool.reserve_x, x_removed, ctx),
             coin::take(&mut pool.reserve_y, y_removed, ctx), x_removed, y_removed
@@ -129,7 +177,7 @@ module univ2::pool {
     }
 
 
-    public(friend) fun swap_x_to_y<CoinIn, CoinOut>(pool: &mut Pool<CoinIn, CoinOut>, in: Coin<CoinIn>, ctx: &mut TxContext): Coin<CoinOut> {
+    public(friend) fun swap_x_to_y<CoinIn, CoinOut>(pool: &mut Pool<CoinIn, CoinOut>, in: Coin<CoinIn>, min_out: u64, ctx: &mut TxContext): (Coin<CoinOut>, u64) {
         let in_value = coin::value(&in);
         assert!(in_value > 0, EZeroAmount);
 
@@ -146,13 +194,25 @@ module univ2::pool {
         assert!(reserve_in > 0 && reserve_out > 0, EReservesEmpty);
 
         let output_amount = get_amount_out(in_value - dao_fee - lp_fee, reserve_in, reserve_out);
-
         balance::join(&mut pool.reserve_x, in_balance);
-        coin::take(&mut pool.reserve_y, output_amount, ctx)
+
+
+        events::emit_swap_event<CoinIn, CoinOut>(
+            tx_context::sender(ctx),
+            in_value,
+            output_amount,
+            min_out,
+            dao_fee,
+            lp_fee,
+            reserve_in,
+            reserve_out
+        );
+
+        (coin::take(&mut pool.reserve_y, output_amount, ctx), reserve_out)
     }
 
 
-    public(friend) fun swap_y_to_x<CoinIn, CoinOut>(pool: &mut Pool<CoinOut, CoinIn>, in: Coin<CoinIn>, ctx: &mut TxContext): Coin<CoinOut> {
+    public(friend) fun swap_y_to_x<CoinIn, CoinOut>(pool: &mut Pool<CoinOut, CoinIn>, in: Coin<CoinIn>, min_out: u64, ctx: &mut TxContext): (Coin<CoinOut>, u64) {
         let in_value = coin::value(&in);
         assert!(in_value > 0, EZeroAmount);
 
@@ -161,7 +221,6 @@ module univ2::pool {
         let lp_fee = get_fee(in_value, pool.lp_fee);
         let dao_coin = coin::split(&mut in, dao_fee, ctx);
         coin::put(&mut pool.fee_y, dao_coin);
-
 
         let in_balance = coin::into_balance(in);
 
@@ -172,7 +231,20 @@ module univ2::pool {
         let output_amount = get_amount_out(in_value - lp_fee - dao_fee, reserve_in, reserve_out);
 
         balance::join(&mut pool.reserve_y, in_balance);
-        coin::take(&mut pool.reserve_x, output_amount, ctx)
+
+
+        events::emit_swap_event<CoinIn, CoinOut>(
+            tx_context::sender(ctx),
+            in_value,
+            output_amount,
+            min_out,
+            dao_fee,
+            lp_fee,
+            reserve_in,
+            reserve_out
+        );
+
+        (coin::take(&mut pool.reserve_x, output_amount, ctx), output_amount)
     }
 
 

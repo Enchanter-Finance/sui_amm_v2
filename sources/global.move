@@ -1,31 +1,31 @@
-module univ2::global {
+module enchanter_swap::global {
     use std::ascii::into_bytes;
     use std::string::{Self, String};
     use std::type_name::{into_string, get};
+
     use sui::object::{Self, UID, ID};
+    use sui::table;
     use sui::transfer;
     use sui::tx_context::{TxContext, sender};
-    use sui::table;
 
-    const ENotAdmin: u64 = 0x0001;
+    const ENotAdmin: u64 = 1;
 
-    friend univ2::swap;
+    friend enchanter_swap::swap;
 
     struct Global has key {
         id: UID,
-        pools: table::Table<String,ID>,
+        pools: table::Table<String, ID>,
         withdraw_address: address,
         manager_address_1: address,
         manager_address_2: address,
     }
-
 
     /// init global config
     fun init(ctx: &mut TxContext) {
         let address = sender(ctx);
         let global = Global {
             id: object::new(ctx),
-            pools: table::new<String,ID>(ctx),
+            pools: table::new<String, ID>(ctx),
             withdraw_address: address,
             manager_address_1: address,
             manager_address_2: address
@@ -63,8 +63,8 @@ module univ2::global {
     }
 
 
-    public(friend) fun add_pool_flag<X, Y>(g: &mut Global,id:ID) {
-        table::add(&mut g.pools, get_pool_name<X, Y>(),id);
+    public(friend) fun add_pool_flag<X, Y>(g: &mut Global, id: ID) {
+        table::add(&mut g.pools, get_pool_name<X, Y>(), id);
     }
 
 

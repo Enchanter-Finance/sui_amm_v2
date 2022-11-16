@@ -1,7 +1,7 @@
 /// auto amm x * y = k
-module univ2::amm_core {
+module enchanter_swap::amm_core {
     use sui::math::{Self, sqrt_u128};
-    use univ2::constants::{get_fee_base_of_percentage, get_min_lp_value};
+    use enchanter_swap::constants::{get_fee_base_of_percentage, get_min_lp_value};
 
     #[test_only]
     use sui::math::pow;

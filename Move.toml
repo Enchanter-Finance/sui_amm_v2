@@ -1,11 +1,11 @@
 [package]
-name = "univ2"
+name = "enchanter_swap"
 version = "0.0.1"
 
 [dependencies]
-Sui = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-framework", rev = "devnet" }
+Sui = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-framework", rev = "76c89912d424ca42140a5849499f1980c5840dae" }
 
 [addresses]
-univ2 =  "0x0"
+enchanter_swap =  "0x0"
 sui =  "0000000000000000000000000000000000000002"
-admin_address =  "0000000000000000000000000000000000000002"
+admin_address =  "0x1bdf11d6e2e852b49cd331213d6658ae64dba7a7"

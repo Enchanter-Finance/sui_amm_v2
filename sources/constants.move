@@ -1,5 +1,5 @@
 /// constant for
-module univ2::constants {
+module enchanter_swap::constants {
     /// fee base of percentage
     public fun get_fee_base_of_percentage(): u64 { 100000 }
 
