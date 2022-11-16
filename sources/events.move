@@ -19,7 +19,6 @@ module enchanter_swap::events {
         pool_id: ID
     }
 
-
     struct AddLpEvent has drop, copy {
         /// signer of sender address
         sender: address,
@@ -83,8 +82,7 @@ module enchanter_swap::events {
         in_amount: u64,
         /// The amount of   get
         out_amount: u64,
-        // user input mini out amount(exact_in) or user max in amount(exact_out)
-        user_limit_amount: u64,
+        out_min_amount: u64,
         /// fee for dao service
         dao_fee: u64,
         /// fee for lp provider
@@ -166,8 +164,7 @@ module enchanter_swap::events {
         in_amount: u64,
         // real out amount
         out_amount: u64,
-        // user input mini out amount(exact_in) or user max in amount(exact_out)
-        user_limit_amount: u64,
+        out_min_amount: u64,
         dao_fee: u64,
         lp_fee: u64,
         reserve_x: u64,
@@ -179,7 +176,7 @@ module enchanter_swap::events {
             out_coin: into_string(get<Out>()),
             in_amount,
             out_amount,
-            user_limit_amount,
+            out_min_amount,
             dao_fee,
             lp_fee,
             reserve_x,

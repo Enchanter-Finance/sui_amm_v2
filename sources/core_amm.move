@@ -1,7 +1,7 @@
 /// auto amm x * y = k
 module enchanter_swap::amm_core {
-    use sui::math::{Self, sqrt_u128};
     use enchanter_swap::constants::{get_fee_base_of_percentage, get_min_lp_value};
+    use sui::math::{Self, sqrt_u128};
 
     #[test_only]
     use sui::math::pow;
@@ -15,9 +15,6 @@ module enchanter_swap::amm_core {
     const ERR_INSUFFICIENT_Y_AMOUNT: u64 = 0x50009;
     const ERR_INSUFFICIENT_X_AMOUNT: u64 = 0x50010;
     const ERR_OVERLIMIT_X: u64 = 0x50011;
-    const ERR_NEGTIVE_FEE: u64 = 0x50012;
-    const ERR_TOOMUCH_AMOUNT: u64 = 0x50013;
-
 
     /// for swap exact in
     public fun get_amount_out(amount_in_without_fee: u64, reserve_in: u64, reserve_out: u64): u64 {
@@ -27,20 +24,6 @@ module enchanter_swap::amm_core {
         let numerator = (amount_in_without_fee as u128) * (reserve_out as u128);
         let denominator = (reserve_in as u128) + (amount_in_without_fee as u128);
         ((numerator / denominator) as u64)
-    }
-
-    /// for swap exact out
-    public fun get_amount_in_with_fee(amount_out: u64, reserve_in: u64, reserve_out: u64, pool_fee: u64): u64 {
-        assert!(amount_out > 0, ERR_WRONG_AMOUNT);
-        assert!(reserve_in > 0 && reserve_out > 0, ERR_INSUFFICIENT_LIQUIDITY);
-        assert!(pool_fee >= 0, ERR_NEGTIVE_FEE);
-        assert!(reserve_out > amount_out, ERR_TOOMUCH_AMOUNT);
-
-        let fee_base_of_percentage = get_fee_base_of_percentage();
-        let percentage_without_fee = fee_base_of_percentage - pool_fee;
-        let numerator = (amount_out as u128) * (reserve_in as u128) * (fee_base_of_percentage as u128);
-        let denominator = ((reserve_out as u128) - (amount_out as u128)) * (percentage_without_fee as u128);
-        ((numerator / denominator) as u64) + 1
     }
 
     /// get lp coin add liquidity
@@ -131,31 +114,6 @@ module enchanter_swap::amm_core {
         let out = get_amount_out(100000 * pow(10, 10), 100000 * pow(10, 10), 100000 * pow(10, 10));
         assert!(out == 50000 * pow(10, 10), out);
     }
-
-    #[test]
-    fun test_get_amount_in_with_fee() {
-        let pool_fee: u64 = 300;
-        let amount_out = 40;
-        let reserve_in = 20028065875;
-        let reserve_out = 998756;
-
-        let need_in = get_amount_in_with_fee(amount_out, reserve_in, reserve_out, 0);
-        let out = get_amount_out(need_in, reserve_in, reserve_out);
-
-        assert!(amount_out <= out, 0);
-
-
-        let out = get_amount_in_with_fee(99, 1000000, 1000000, pool_fee);
-        assert!(out == 100, out);
-
-        let out = get_amount_in_with_fee(99, 1000000 * pow(10, 8), 1000000 * pow(10, 8), pool_fee);
-        assert!(out == 100, out);
-
-
-        let out = get_amount_in_with_fee(500000 * pow(10, 8), 1000000 * pow(10, 8), 1000000 * pow(10, 8), pool_fee);
-        assert!(out == 100300902708125, out);
-    }
-
 
     #[test]
     fun test_get_coinx_coiny_by_lp_coin() {

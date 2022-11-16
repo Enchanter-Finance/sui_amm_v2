@@ -1,10 +1,10 @@
 module enchanter_swap::swap {
+    use enchanter_swap::global::{Self, Global, exist_pool};
+    use enchanter_swap::pool::{Self, Pool, LPCoin};
     use sui::coin::{Self, Coin};
     use sui::pay;
     use sui::transfer;
     use sui::tx_context::{Self, TxContext};
-    use enchanter_swap::global::{Self, Global, exist_pool};
-    use enchanter_swap::pool::{Self, Pool, LPCoin};
 
     const EHaveSlippage: u64 = 1;
     const EPoolExist: u64 = 2;

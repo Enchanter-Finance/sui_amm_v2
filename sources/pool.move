@@ -1,13 +1,13 @@
 module enchanter_swap::pool {
+    use enchanter_swap::amm_core::{get_lp_coin_by_coinx_coiny_amount, get_coinx_coiny_by_lp_coin, get_amount_out, get_fee, get_no_loss_values};
+    use enchanter_swap::constants::{get_default_fee, get_min_lp_value};
+    use enchanter_swap::events;
+    use enchanter_swap::global::{Self, Global, get_manager_address};
     use sui::balance::{Self, Balance, Supply};
     use sui::coin::{Self, Coin};
     use sui::object::{Self, UID, ID};
     use sui::transfer;
     use sui::tx_context::{Self, TxContext};
-    use enchanter_swap::amm_core::{get_lp_coin_by_coinx_coiny_amount, get_coinx_coiny_by_lp_coin, get_amount_out, get_fee, get_no_loss_values};
-    use enchanter_swap::constants::{get_default_fee, get_min_lp_value};
-    use enchanter_swap::events;
-    use enchanter_swap::global::{Self, Global, get_manager_address};
 
     friend enchanter_swap::swap;
 
