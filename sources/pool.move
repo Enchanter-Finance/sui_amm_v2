@@ -105,7 +105,7 @@ module enchanter_swap::pool {
 
         let (no_loss_x, no_loss_y) = get_no_loss_values(coin_x_amount, coin_y_amount, coin_x_min, coin_y_min, reserve_x, reserve_y);
 
-        let (coin_x_rest_amount, coin_y_rest_amount) = (coin_x_value - reserve_x, coin_y_value - no_loss_y);
+        let (coin_x_rest_amount, coin_y_rest_amount) = (coin_x_value - no_loss_x, coin_y_value - no_loss_y);
 
         let coin_x_rest = coin::split(&mut coin_x, coin_x_rest_amount, ctx);
         let coin_y_rest = coin::split(&mut coin_y, coin_y_rest_amount, ctx);
