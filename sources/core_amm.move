@@ -26,6 +26,16 @@ module enchanter_swap::amm_core {
         ((numerator / denominator) as u64)
     }
 
+    /// for swap exact out
+    public fun get_amount_in_with_fee(amount_out: u64, reserve_in: u64, reserve_out: u64, pool_fee: u64): u64 {
+        assert!(amount_out > 0, ERR_INSUFFICIENT_INPUT_AMOUNT);
+        assert!(reserve_in > 0 && reserve_out > 0, ERR_INSUFFICIENT_LIQUIDITY);
+
+        let numerator = (pool_fee as u128) * (reserve_out as u128);
+        let denominator = (reserve_in as u128) + (pool_fee as u128);
+        ((numerator / denominator) as u64)
+    }
+
     /// get lp coin add liquidity
     public fun get_lp_coin_by_coinx_coiny_amount(coin_x_value: u64, coin_y_value: u64, total_supply: u128, reserve_x: u64, reserve_y: u64): u64 {
         if (total_supply == 0) {

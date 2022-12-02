@@ -1,11 +1,11 @@
 module enchanter_swap::pool {
-    use enchanter_swap::amm_core::{get_lp_coin_by_coinx_coiny_amount, get_coinx_coiny_by_lp_coin, get_amount_out, get_fee, get_no_loss_values};
+    use enchanter_swap::amm_core::{get_lp_coin_by_coinx_coiny_amount, get_coinx_coiny_by_lp_coin, get_amount_out, get_amount_in_with_fee, get_fee, get_no_loss_values};
     use enchanter_swap::constants::{get_default_fee, get_min_lp_value};
     use enchanter_swap::events;
     use enchanter_swap::global::{Self, Global, get_manager_address};
     use sui::balance::{Self, Balance, Supply};
     use sui::coin::{Self, Coin};
-    use sui::object::{Self, UID, ID};
+    use sui::object::{Self, UID};
     use sui::transfer;
     use sui::tx_context::{Self, TxContext};
 
@@ -64,7 +64,7 @@ module enchanter_swap::pool {
     }
 
 
-    public(friend) fun create_pool<X, Y>(ctx: &mut TxContext): ID {
+    public(friend) fun create_pool<X, Y>(ctx: &mut TxContext): Pool<X, Y> {
         let (dao_fee, lp_fee) = get_default_fee();
 
         let pool = Pool<X, Y> {
@@ -85,7 +85,7 @@ module enchanter_swap::pool {
         events::emit_create_pool_event<X, Y>(tx_context::sender(ctx), id);
 
         transfer::share_object(pool);
-        id
+        pool
     }
 
     public(friend) fun add_liquidity<X, Y>(pool: &mut Pool<X, Y>,
@@ -177,7 +177,19 @@ module enchanter_swap::pool {
     }
 
 
-    public(friend) fun swap_x_to_y<CoinIn, CoinOut>(pool: &mut Pool<CoinIn, CoinOut>, in: Coin<CoinIn>, min_out: u64, ctx: &mut TxContext): (Coin<CoinOut>, u64) {
+    public(friend) fun extract_amount_in_with_fee_x_to_y<CoinIn, CoinOut>(pool: &mut Pool<CoinIn, CoinOut>, amount_out: u64): u64 {
+        let (reserve_x, reserve_y, _) = get_reserve(pool);
+        get_amount_in_with_fee(amount_out, reserve_x, reserve_y, pool.dao_fee + pool.lp_fee)
+    }
+
+
+    public(friend) fun extract_amount_in_with_fee_y_to_x<CoinIn, CoinOut>(pool: &mut Pool<CoinOut, CoinIn>, amount_out: u64): u64 {
+        let (reserve_y, reserve_x, _) = get_reserve(pool);
+        get_amount_in_with_fee(amount_out, reserve_x, reserve_y, pool.dao_fee + pool.lp_fee)
+    }
+
+
+    public(friend) fun swap_x_to_y_exact_in<CoinIn, CoinOut>(pool: &mut Pool<CoinIn, CoinOut>, in: Coin<CoinIn>, min_out: u64, ctx: &mut TxContext): (Coin<CoinOut>, u64) {
         let in_value = coin::value(&in);
         assert!(in_value > 0, EZeroAmount);
 
@@ -212,7 +224,7 @@ module enchanter_swap::pool {
     }
 
 
-    public(friend) fun swap_y_to_x<CoinIn, CoinOut>(pool: &mut Pool<CoinOut, CoinIn>, in: Coin<CoinIn>, min_out: u64, ctx: &mut TxContext): (Coin<CoinOut>, u64) {
+    public(friend) fun swap_y_to_x_exact_in<CoinIn, CoinOut>(pool: &mut Pool<CoinOut, CoinIn>, in: Coin<CoinIn>, min_out: u64, ctx: &mut TxContext): (Coin<CoinOut>, u64) {
         let in_value = coin::value(&in);
         assert!(in_value > 0, EZeroAmount);
 
@@ -245,6 +257,74 @@ module enchanter_swap::pool {
         );
 
         (coin::take(&mut pool.reserve_x, output_amount, ctx), output_amount)
+    }
+
+
+    public(friend) fun swap_x_to_y_exact_out<CoinIn, CoinOut>(pool: &mut Pool<CoinIn, CoinOut>, in: Coin<CoinIn>, amount_out: u64, max_in: u64, ctx: &mut TxContext): (Coin<CoinOut>, u64) {
+        let in_value = coin::value(&in);
+        assert!(in_value > 0, EZeroAmount);
+
+
+        let dao_fee = get_fee(in_value, pool.dao_fee);
+        let lp_fee = get_fee(in_value, pool.lp_fee);
+        let dao_coin = coin::split(&mut in, dao_fee, ctx);
+        coin::put(&mut pool.fee_x, dao_coin);
+
+        let in_balance = coin::into_balance(in);
+
+        let (reserve_in, reserve_out, _) = get_reserve(pool);
+
+        assert!(reserve_in > 0 && reserve_out > 0, EReservesEmpty);
+
+        balance::join(&mut pool.reserve_x, in_balance);
+
+
+        events::emit_swap_event<CoinIn, CoinOut>(
+            tx_context::sender(ctx),
+            in_value,
+            amount_out,
+            max_in,
+            dao_fee,
+            lp_fee,
+            reserve_in,
+            reserve_out
+        );
+
+        (coin::take(&mut pool.reserve_y, amount_out, ctx), reserve_out)
+    }
+
+
+    public(friend) fun swap_y_to_x_exact_out<CoinIn, CoinOut>(pool: &mut Pool<CoinOut, CoinIn>, in: Coin<CoinIn>, amount_out: u64, max_in: u64, ctx: &mut TxContext): (Coin<CoinOut>, u64) {
+        let in_value = coin::value(&in);
+        assert!(in_value > 0, EZeroAmount);
+
+
+        let dao_fee = get_fee(in_value, pool.dao_fee);
+        let lp_fee = get_fee(in_value, pool.lp_fee);
+        let dao_coin = coin::split(&mut in, dao_fee, ctx);
+        coin::put(&mut pool.fee_y, dao_coin);
+
+        let in_balance = coin::into_balance(in);
+
+        let (reserve_out, reserve_in, _) = get_reserve(pool);
+
+        assert!(reserve_in > 0 && reserve_out > 0, EReservesEmpty);
+
+        balance::join(&mut pool.reserve_y, in_balance);
+
+
+        events::emit_swap_event<CoinIn, CoinOut>(
+            tx_context::sender(ctx),
+            in_value,
+            amount_out,
+            max_in,
+            dao_fee,
+            lp_fee,
+            reserve_in,
+            reserve_out
+        );
+
+        (coin::take(&mut pool.reserve_x, amount_out, ctx), amount_out)
     }
 
 
