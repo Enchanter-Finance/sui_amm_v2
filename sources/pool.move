@@ -83,8 +83,6 @@ module enchanter_swap::pool {
         let id = object::id(&pool);
 
         events::emit_create_pool_event<X, Y>(tx_context::sender(ctx), id);
-
-        transfer::share_object(pool);
         pool
     }
 
@@ -220,7 +218,7 @@ module enchanter_swap::pool {
             reserve_out
         );
 
-        (coin::take(&mut pool.reserve_y, output_amount, ctx), reserve_out)
+        (coin::take(&mut pool.reserve_y, output_amount, ctx), output_amount)
     }
 
 
@@ -260,7 +258,7 @@ module enchanter_swap::pool {
     }
 
 
-    public(friend) fun swap_x_to_y_exact_out<CoinIn, CoinOut>(pool: &mut Pool<CoinIn, CoinOut>, in: Coin<CoinIn>, amount_out: u64, max_in: u64, ctx: &mut TxContext): (Coin<CoinOut>, u64) {
+    public(friend) fun swap_x_to_y_exact_out<CoinIn, CoinOut>(pool: &mut Pool<CoinIn, CoinOut>, in: Coin<CoinIn>, amount_out: u64, max_in: u64, ctx: &mut TxContext): Coin<CoinOut> {
         let in_value = coin::value(&in);
         assert!(in_value > 0, EZeroAmount);
 
@@ -290,11 +288,11 @@ module enchanter_swap::pool {
             reserve_out
         );
 
-        (coin::take(&mut pool.reserve_y, amount_out, ctx), reserve_out)
+        coin::take(&mut pool.reserve_y, amount_out, ctx)
     }
 
 
-    public(friend) fun swap_y_to_x_exact_out<CoinIn, CoinOut>(pool: &mut Pool<CoinOut, CoinIn>, in: Coin<CoinIn>, amount_out: u64, max_in: u64, ctx: &mut TxContext): (Coin<CoinOut>, u64) {
+    public(friend) fun swap_y_to_x_exact_out<CoinIn, CoinOut>(pool: &mut Pool<CoinOut, CoinIn>, in: Coin<CoinIn>, amount_out: u64, max_in: u64, ctx: &mut TxContext): Coin<CoinOut> {
         let in_value = coin::value(&in);
         assert!(in_value > 0, EZeroAmount);
 
@@ -324,7 +322,7 @@ module enchanter_swap::pool {
             reserve_out
         );
 
-        (coin::take(&mut pool.reserve_x, amount_out, ctx), amount_out)
+        coin::take(&mut pool.reserve_x, amount_out, ctx)
     }
 
 

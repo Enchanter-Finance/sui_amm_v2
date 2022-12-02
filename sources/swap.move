@@ -24,6 +24,7 @@ module enchanter_swap::swap {
         global::add_pool_flag<X, Y>(global, id);
 
         add_liquidity(&mut pool, coin_x, coin_y, coin_x_amount, coin_x_min, coin_y_amount, coin_y_min, ctx);
+        transfer::share_object(pool);
     }
 
     /// create pool
@@ -31,6 +32,7 @@ module enchanter_swap::swap {
         assert!(!exist_pool<X, Y>(global) || !exist_pool<Y, X>(global), EPoolExist);
         let pool = pool::create_pool<X, Y>(ctx);
         let id = object::id(&pool);
+        transfer::share_object(pool);
         global::add_pool_flag<X, Y>(global, id);
     }
 
@@ -130,7 +132,7 @@ module enchanter_swap::swap {
 
         let real = coin::split(&mut in_coin, in_amount, ctx);
 
-        let (out, out_amount) = pool::swap_x_to_y_exact_out(pool, real, in_amount, max_in, ctx);
+        let out = pool::swap_x_to_y_exact_out(pool, real, in_amount, max_in, ctx);
 
         let sender = tx_context::sender(ctx);
         transfer::transfer(in_coin, sender);
@@ -146,7 +148,7 @@ module enchanter_swap::swap {
         let in_coin = coin::zero<CoinIn>(ctx);
         pay::join_vec(&mut in_coin, in);
         let real = coin::split(&mut in_coin, in_amount, ctx);
-        let (out, out_amount) = pool::swap_y_to_x_exact_out(pool, real, in_amount, max_in, ctx);
+        let out = pool::swap_y_to_x_exact_out(pool, real, in_amount, max_in, ctx);
 
         let sender = tx_context::sender(ctx);
         transfer::transfer(in_coin, sender);
