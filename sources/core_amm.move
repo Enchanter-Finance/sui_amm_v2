@@ -15,6 +15,8 @@ module enchanter_swap::amm_core {
     const ERR_INSUFFICIENT_Y_AMOUNT: u64 = 0x50009;
     const ERR_INSUFFICIENT_X_AMOUNT: u64 = 0x50010;
     const ERR_OVERLIMIT_X: u64 = 0x50011;
+    const ERR_NEGTIVE_FEE: u64 = 0x50012;
+    const ERR_TOOMUCH_AMOUNT: u64 = 0x50013;
 
     /// for swap exact in
     public fun get_amount_out(amount_in_without_fee: u64, reserve_in: u64, reserve_out: u64): u64 {
@@ -28,12 +30,16 @@ module enchanter_swap::amm_core {
 
     /// for swap exact out
     public fun get_amount_in_with_fee(amount_out: u64, reserve_in: u64, reserve_out: u64, pool_fee: u64): u64 {
-        assert!(amount_out > 0, ERR_INSUFFICIENT_INPUT_AMOUNT);
+        assert!(amount_out > 0, ERR_WRONG_AMOUNT);
         assert!(reserve_in > 0 && reserve_out > 0, ERR_INSUFFICIENT_LIQUIDITY);
+        assert!(pool_fee >= 0, ERR_NEGTIVE_FEE);
+        assert!(reserve_out > amount_out, ERR_TOOMUCH_AMOUNT);
 
-        let numerator = (pool_fee as u128) * (reserve_out as u128);
-        let denominator = (reserve_in as u128) + (pool_fee as u128);
-        ((numerator / denominator) as u64)
+        let fee_base_of_percentage = get_fee_base_of_percentage();
+        let percentage_without_fee = fee_base_of_percentage - pool_fee;
+        let numerator = (amount_out as u128) * (reserve_in as u128) * (fee_base_of_percentage as u128);
+        let denominator = ((reserve_out as u128) - (amount_out as u128)) * (percentage_without_fee as u128);
+        ((numerator / denominator) as u64) + 1
     }
 
     /// get lp coin add liquidity
